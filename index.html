@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0a10" />
+  <title>入梦悬城 · 互动小说</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body class="world-reality">
+  <div id="app">
+    <div id="grain"></div>
+    <div id="fx-vignette"></div>
+
+    <!-- 阅读器 -->
+    <div id="reader" class="hidden">
+      <div id="flow"></div>
+    </div>
+
+    <div id="progress-line"></div>
+
+    <!-- 顶栏 -->
+    <div id="topbar" class="hidden">
+      <span id="chapter-label">入梦悬城</span>
+      <div id="beads"></div>
+      <button class="icon-btn" id="btn-clues">册<span id="clue-badge">0</span></button>
+      <button class="icon-btn" id="btn-sound">♪</button>
+    </div>
+
+    <div id="tap-hint" class="hidden">轻 触 屏 幕 · 继 续</div>
+
+    <!-- 章节卡 -->
+    <div id="chapter-card">
+      <div class="cnum" id="chapter-num">第 一 章</div>
+      <div class="ctitle" id="chapter-title">失意</div>
+      <div class="cgo">轻 触 进 入</div>
+    </div>
+
+    <!-- 结尾卡 -->
+    <div id="ending-card" class="chapter-card" style="position:absolute;inset:0;z-index:33;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(8,6,9,.97);color:#e8ddc9;opacity:0;pointer-events:none;transition:opacity .8s;">
+      <div class="cnum" style="font-size:13px;letter-spacing:10px;color:#b3232a;margin-bottom:14px;">入梦悬城</div>
+      <div class="ctitle" style="font-family:var(--brush);font-size:34px;letter-spacing:8px;" id="ending-title">第 1 ~ 4 章 · 完</div>
+      <div class="elines" id="ending-lines" style="margin-top:30px;font-size:14px;line-height:2.6;color:#b3a68f;text-align:center;letter-spacing:2px;"></div>
+      <div class="btn-row" style="width:78%;margin-top:44px;">
+        <div class="btn primary" id="btn-restart">重 新 入 梦</div>
+      </div>
+    </div>
+
+    <!-- 线索图鉴 -->
+    <div id="drawer-mask"></div>
+    <div id="clue-drawer">
+      <h2>线索图鉴</h2>
+      <div class="dsub">已收集 <span id="clue-count">0 / 0</span> · 悬城之谜，散落于字里行间</div>
+      <div id="clue-list"></div>
+    </div>
+
+    <div id="toast"></div>
+    <div id="fx-fall"></div>
+    <div id="fx-flash"></div>
+
+    <!-- 标题屏 -->
+    <div id="title-screen">
+      <div class="cover"></div>
+      <div class="shade"></div>
+      <div class="inner">
+        <h1>入梦悬城</h1>
+        <div class="sub">悬疑 · 群像 · 双世界 ｜ 互动小说</div>
+        <div class="meta">原著 · 零陆贰陆 ｜ 第 1 ~ 4 章 · 试读版<br />有人做梦会进入同一座城。今夜，轮到韦桉。</div>
+        <div class="btn-row">
+          <div class="btn primary" id="btn-start">开 始 阅 读</div>
+          <div class="btn hidden" id="btn-continue">继 续 上 次</div>
+        </div>
+        <div class="note">建议开启声音与震动 · 竖屏体验最佳</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
