@@ -11,6 +11,7 @@ const ambients = {
   night:    A + 'amb_night.mp3',
   dreamlow: A + 'amb_dream.mp3',
   forest:   A + 'amb_forest.mp3',
+  market:   A + 'amb_market.mp3',
 };
 const sfxMap = {
   monitor_once: A + 'sfx_monitor.mp3',
@@ -23,6 +24,8 @@ const sfxMap = {
   boom:    A + 'sfx_boom.mp3',
   run:     A + 'sfx_run.mp3',
   pull:    A + 'sfx_pull.mp3',
+  bell:    A + 'sfx_bell.mp3',
+  whoosh:  A + 'sfx_whoosh.mp3',
 };
 let curAmbient = null, curAmbientKey = 'none';
 function playAmbient(key) {
@@ -131,6 +134,29 @@ function shake(hard) {
   setTimeout(() => app.classList.remove(cls), hard ? 900 : 550);
 }
 
+/* ───────── 晨钟特效 ───────── */
+function bell() {
+  playSfx('bell');
+  const layer = $('#fx-bell');
+  if (layer) {
+    const glow = document.createElement('div');
+    glow.className = 'bell-glow';
+    layer.appendChild(glow);
+    setTimeout(() => glow.remove(), 2000);
+    [0, 260, 560].forEach((d, i) => {
+      setTimeout(() => {
+        const r = document.createElement('div');
+        r.className = 'bell-ring';
+        if (i === 2) r.style.borderColor = 'rgba(232,206,150,.7)';
+        layer.appendChild(r);
+        setTimeout(() => r.remove(), 2000);
+      }, d);
+    });
+  }
+  shake(false);
+  vibrate([60, 90, 60, 90, 140]);
+}
+
 /* ───────── 裂屏特效 ───────── */
 function glassShatter() {
   const cv = $('#fx-glass');
@@ -220,6 +246,7 @@ function applyFx(fx) {
     case 'sting': vignettePulse(); shake(false); vibrate([60, 40, 90]); break;
     case 'heartbeat': heartbeat(); break;
     case 'glass': glassShatter(); break;
+    case 'bell': bell(); break;
   }
 }
 
