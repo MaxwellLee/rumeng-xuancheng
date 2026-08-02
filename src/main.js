@@ -702,14 +702,16 @@ function advance() {
   const ch = CHAPTERS[state.c];
   if (state.i + 1 >= ch.seg.length) {
     if (state.c + 1 >= CHAPTERS.length) { setAuto(false); showEnding(); return; }
-    state.c++; state.i = -1;
+    state.c++; state.i = 0;
     state.maxC = Math.max(state.maxC, state.c);   // 解锁新章节
     save();
     const nch = CHAPTERS[state.c];
-    showChapterCard(nch, () => {
+    const seg0 = nch.seg[0];
+    showChapterCard(nch, () => {          // 章节卡只弹这一次
       setWorld(nch.world);
       playAmbient(nch.ambient);
-      advance();
+      applySegment(seg0);
+      if (autoMode) lastDwell.then(scheduleNext);
     });
     return;
   }
@@ -774,6 +776,7 @@ function enterReader(fresh) {
     $('#chapter-label').textContent = `第${ch.n}章 · ${ch.title}`;
     playAmbient(ch.ambient);
     flow.scrollTop = flow.scrollHeight;
+    if (state.i < 0) advance();   // 章首就是互动段、指针被回退成 -1 时：直接继续，避免空屏
   } else {
     advance();
   }
@@ -880,7 +883,7 @@ function openChapterDrawer() {
 function jumpToChapter(k) {
   closeDrawer();
   setAuto(false);
-  pendingChoice = null; cutscene = false; gameActive = null;
+  pendingChoice = null; cutscene = false; gameActive = null; checkpoint = null;
   state.c = k; state.i = -1; state.done = false;
   state.bead = k >= 3 ? 2 : (k >= 1 ? 1 : 0);   // 玉珠状态对齐剧情：1章裂、3章碎
   flow.innerHTML = '';
