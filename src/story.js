@@ -123,6 +123,15 @@ export const CHAPTERS = [
       { t: 'n', text: '天才刚擦黑，韦桉便在疲惫中进入梦乡。', fx: 'slow', world: 'dream', ambient: 'dreamlow' },
       { t: 'n', text: '浓稠黏腻的黑暗里，他又一次听见了零碎的呼唤——' },
       { t: 'v', text: '“……速归……决明……救救他……没时间了！！！”', clue: 'calling', fx: 'sting', voice: 'call2' },
+      { t: 'choice', id: 'followvoice', options: [
+        { text: '翻个身，继续睡', next: true },
+        { text: '循着声音，走过去', branch: [
+          { t: 'n', text: '你鬼使神差地翻下床，赤着脚，循着那声音走去。', world: 'dream', ambient: 'dreamlow', fx: 'fall' },
+          { t: 'n', text: '黑暗的尽头裂开一道缝——一座朱漆剥落的城门，立在血色的天幕下。门楣上两个字，你不认识，却十分熟悉。', img: 'gate', fx: 'slow' },
+          { t: 'v', text: '“决明……速归……”', voice: 'call2' },
+          { t: 'n', text: '风从门缝里灌出来，吹得你睁不开眼——', fx: 'vibrate' },
+        ] },
+      ] },
       { t: 'n', text: '韦桉虎口一疼，猛地惊醒！', world: 'reality', fx: 'flash', ambient: 'night' },
       { t: 'n', text: '一只灰白相间、脸有深灰枫叶纹路的大布偶猫，正咬着他的手不放。', clue: 'goudan', img: 'cat', fx: 'shake' },
       { t: 'd', who: '韦桉', text: '狗蛋！又咬！！你是要谋杀亲爹吗！', voice: 'goudan' },
@@ -203,6 +212,10 @@ export const CHAPTERS = [
   {
     n: 4, title: '油锯狂魔', world: 'dream', ambient: 'forest',
     seg: [
+      { t: 'choice', id: 'ch4run', options: [
+        { text: '转身就跑', next: true },
+        { text: '壮着胆子，凑近看看', death: 'curious' },
+      ] },
       { t: 'n', text: '韦桉的脑子还没反应过来，腿已经风火轮一样抡起来开跑。心脏在胸腔里狂跳，肾上腺素让他觉得自己能跟博尔特掰一掰。', fx: 'heartbeat', sfx: 'run' },
       { t: 'n', text: '他甚至不敢回头看那东西追上来没有，张着大嘴边喊边跑，生怕别人不知道他在这。', fx: 'heartbeat' },
       { t: 'n', text: '身后传来几声奇怪的叹息。那东西似乎已经意识到他的恐惧——重重的脚步声，越来越近。', fx: 'heartbeat' },
@@ -216,6 +229,10 @@ export const CHAPTERS = [
       { t: 'i', text: '如果这是一片林子，保不齐运气好，会碰上一把别人落下的油锯呢！到时候抄起油锯就是我的主场，真理在手，天下我——嗯？' },
       { t: 'n', text: '右手突然一沉，差点把韦桉拉倒在地。他定睛一看——', clue: 'chainsaw', sfx: 'pickup' },
       { t: 'n', text: '一把崭新的油锯，正握在自己手中！', fx: 'shake', img: 'fight1' },
+      { t: 'choice', id: 'ch4saw', options: [
+        { text: '抡起油锯，干！', next: true },
+        { text: '把油锯扔出去引开它，继续跑', death: 'throwsaw' },
+      ] },
       { t: 'n', text: '韦桉简直不敢相信自己的眼睛，咬牙双手拎着沉甸甸的油锯继续跑。可这油锯太沉了，负重逃命的压迫感让人难以呼吸。' },
       { t: 'i', text: '放手一搏吧！' },
       { t: 'n', text: '韦桉认命般停下脚步，猛地转身，大吼一声——', fx: 'shakeHard' },
@@ -227,7 +244,8 @@ export const CHAPTERS = [
       { t: 'n', text: '它没有人类的颜色，只有半透明般乳白的皮肤，皮肤下隐约可见一丝丝发光的细线在流动，竟有一分诡异的圣洁感——如果它身上没有不断冒起又破裂的脓包的话。' },
       { t: 'i', text: '它就像一个正在融化的香草冰淇淋。看起来真是，美味又惊悚。' },
       { t: 'n', text: '那东西不给他考虑的时间，一步一步，慢慢地朝他靠近。' },
-      { t: 'n', text: '韦桉咬咬牙，颤抖着掰开油锯开关，拉开风门拉杆，抓着启动手柄火速拽了几下——', sfx: 'cs_start', img: 'fight2', fx: 'vibrate' },
+      { t: 'n', text: '韦桉咬咬牙，颤抖着掰开油锯开关，拉开风门拉杆，抓住了启动手柄——', img: 'fight2', fx: 'vibrate' },
+      { t: 'game', id: 'pullcord' },
       { t: 'n', text: '发动机轰鸣。他捏了捏油门扳机，油锯发出一声低沉的咆哮。', sfx: 'cs_run', fx: 'vibrate' },
       { t: 'd', who: '韦桉', text: '奶奶的，我倒要看看，是树更硬，还是你更硬！', voice: 'battle' },
       { t: 'n', text: '他怒吼一声，横起油锯冲了上去。', fx: 'shakeHard', img: 'fight3' },
@@ -249,6 +267,26 @@ export const CHAPTERS = [
     ],
   },
 ];
+
+export const DEATHS = {
+  curious: [
+    '你拨开雾气，壮着胆子，凑到那东西的面前。',
+    '它“看”着你。三个空洞里，像是有风在转。',
+    '下一秒，世界安静了。',
+    '在梦里被它碰到，可不是换个梦就能了事的。',
+  ],
+  throwsaw: [
+    '你用尽全身力气，把油锯朝相反的方向扔了出去。',
+    '它，头也没回。',
+    '沉重的脚步声在你背后响起，比刚才更近，更快。',
+    '在梦里，它比你快。',
+  ],
+  gamefail: [
+    '拉绳被你拽得咔咔作响，发动机却一声也没着。',
+    '腥臭的风，已经扑到了你的后颈。',
+    '你最后看见的，是三个越来越近的黑洞。',
+  ],
+};
 
 export const ENDING = {
   title: '第 1 ~ 4 章 · 完',

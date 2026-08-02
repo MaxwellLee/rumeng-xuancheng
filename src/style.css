@@ -191,6 +191,66 @@ canvas.wave {
 }
 #auto-ind.show { opacity: 1; animation: hintPulse 2.4s ease-in-out infinite; }
 
+/* ───── 选择点 ───── */
+.choices { display: flex; flex-direction: column; gap: 12px; margin: 6px 0 26px; }
+.choice-btn {
+  position: relative; padding: 15px 18px; border-radius: 6px; cursor: pointer;
+  font-family: var(--serif); font-size: 16px; letter-spacing: 2px; text-align: center;
+  color: #e8ddc9; background: rgba(20,14,18,.82);
+  border: 1px solid rgba(179,35,42,.55);
+  box-shadow: 0 4px 18px rgba(0,0,0,.35), inset 0 0 18px rgba(179,35,42,.08);
+  transition: transform .15s ease, background .3s;
+}
+.choice-btn:active { transform: scale(.97); }
+.choice-btn.picked { background: rgba(140,29,35,.85); }
+.choice-btn:disabled { cursor: default; opacity: .55; }
+.choice-btn.picked:disabled { opacity: 1; }
+.choice-btn .handprint {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%) rotate(-18deg);
+  color: #b3232a; font-size: 20px; opacity: .85; filter: saturate(1.4);
+}
+.choice-btn.died { border-style: dashed; }
+
+/* ───── 死亡卡 ───── */
+#death-card {
+  position: absolute; inset: 0; z-index: 38; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 60%, rgba(120,10,15,.5), transparent 60%),
+    #050307;
+  opacity: 0; pointer-events: none; transition: opacity 1s ease;
+  cursor: pointer;
+}
+#death-card.show { opacity: 1; pointer-events: auto; }
+#death-card .die {
+  font-family: var(--brush); font-size: 110px; color: #b3232a;
+  text-shadow: 0 0 60px rgba(179,35,42,.8); letter-spacing: 20px;
+  transform: scale(.6); transition: transform 1.2s cubic-bezier(.2,1.4,.3,1);
+}
+#death-card.show .die { transform: scale(1); }
+#death-card .die-sub { margin-top: 34px; font-size: 12px; letter-spacing: 6px; color: #8d8276; animation: hintPulse 2.4s infinite; }
+
+/* ───── 拉绳小游戏 ───── */
+.game-panel {
+  margin: 6px 0 26px; padding: 22px 20px; border-radius: 10px;
+  background: rgba(16,12,16,.9); border: 1px solid rgba(179,35,42,.6);
+  box-shadow: 0 8px 30px rgba(0,0,0,.5), inset 0 0 26px rgba(179,35,42,.07);
+  text-align: center; color: #e8ddc9;
+}
+.game-title { font-family: var(--brush); font-size: 30px; letter-spacing: 8px; color: #e3d3ae; }
+.game-tip { margin-top: 10px; font-size: 13.5px; letter-spacing: 1px; color: #a99c87; }
+.game-tip b { color: #e8ddc9; }
+.game-prog { margin-top: 16px; height: 12px; border-radius: 6px; background: rgba(255,255,255,.07); overflow: hidden; }
+.game-prog-fill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #8a5a2b, #b3232a);
+  transition: width .25s ease;
+}
+.game-count { margin-top: 10px; font-size: 12px; letter-spacing: 2px; color: #c9b48f; }
+.game-timer { margin-top: 8px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.06); overflow: hidden; }
+.game-timer-fill { height: 100%; width: 100%; background: #7f1d1d; transition: width .1s linear; }
+.game-panel.game-done { border-color: rgba(120,180,120,.6); }
+
 #tap-hint {
   position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); left: 0; right: 0;
   text-align: center; font-size: 11px; letter-spacing: 4px; opacity: .4; z-index: 11;

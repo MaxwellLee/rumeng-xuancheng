@@ -1,4 +1,4 @@
-import { CHAPTERS, CLUES, IMAGES, VOICES, ENDING } from './story.js';
+import { CHAPTERS, CLUES, IMAGES, VOICES, DEATHS, ENDING } from './story.js';
 
 const $ = (s) => document.querySelector(s);
 const app = $('#app'), flow = $('#flow'), body = document.body;
@@ -22,6 +22,7 @@ const sfxMap = {
   cs_run:  A + 'sfx_chainsaw_run.mp3',
   boom:    A + 'sfx_boom.mp3',
   run:     A + 'sfx_run.mp3',
+  pull:    A + 'sfx_pull.mp3',
 };
 let curAmbient = null, curAmbientKey = 'none';
 function playAmbient(key) {
@@ -77,10 +78,11 @@ function playVoice(id) {
 
 /* ───────── 状态 ───────── */
 const SAVE_KEY = 'rmxc-save-v2';
-let state = { c: 0, i: -1, clues: [], bead: 0, sound: true, done: false };
+let state = { c: 0, i: -1, clues: [], bead: 0, sound: true, done: false, deaths: [] };
 try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY));
   if (s && typeof s.c === 'number') state = Object.assign(state, s);
+  if (!Array.isArray(state.deaths)) state.deaths = [];
 } catch (e) {}
 function save() { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
 
@@ -330,12 +332,213 @@ function startWave(cv) {
   })();
 }
 
+/* ───────── 选择点 / 死亡回档 / 小游戏 ───────── */
+let checkpoint = null;   // 回档点
+let gameActive = null;   // 进行中的小游戏
+let pendingChoice = null; // 未解决的选择点
+let cutscene = false;     // 分支/死亡演出中（禁止推进）
+
+function makeCheckpoint() {
+  checkpoint = {
+    c: state.c, i: state.i, bead: state.bead,
+    flowCount: flow.childElementCount,
+    world: body.classList.contains('world-dream') ? 'dream' : 'reality',
+    ambient: curAmbientKey,
+    label: $('#chapter-label').textContent,
+  };
+}
+
+function choicesNode(seg) {
+  const box = document.createElement('div');
+  box.className = 'seg choices';
+  seg.options.forEach((opt) => {
+    const b = document.createElement('button');
+    b.className = 'choice-btn';
+    b.innerHTML = `<span>${opt.text}</span>`;
+    if (opt.death && state.deaths.includes(opt.death)) {
+      b.classList.add('died');
+      b.innerHTML += '<span class="handprint">🖐</span>';
+    }
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (pendingChoice !== box) return;
+      pendingChoice = null;
+      box.querySelectorAll('button').forEach((x) => { x.disabled = true; });
+      b.classList.add('picked');
+      if (opt.next) setTimeout(() => advance(), 350);
+      else if (opt.branch) runBranch(opt.branch);
+      else if (opt.death) runDeath(opt.death);
+    });
+    box.appendChild(b);
+  });
+  return box;
+}
+
+/* 彩蛋分支：逐段演出后回到主线 */
+function runBranch(segs) {
+  cutscene = true;
+  let k = 0;
+  (function next() {
+    if (k >= segs.length) { cutscene = false; return; }
+    applySegmentLite(segs[k++]);
+    setTimeout(next, 1600);
+  })();
+}
+
+/* 死亡：演出死亡段落 → 死亡卡 → 回档 */
+function runDeath(id) {
+  cutscene = true;
+  if (!state.deaths.includes(id)) { state.deaths.push(id); save(); }
+  const lines = DEATHS[id] || ['……'];
+  let k = 0;
+  (function next() {
+    if (k >= lines.length) { setTimeout(showDeathCard, 900); return; }
+    applySegmentLite({ t: 'n', text: lines[k], fx: k === lines.length - 1 ? 'sting' : undefined });
+    k++;
+    setTimeout(next, 1500);
+  })();
+}
+
+function showDeathCard() {
+  playAmbient('none');
+  const d = $('#death-card');
+  d.classList.add('show');
+  vibrate([150, 80, 220]);
+  const back = () => {
+    d.classList.remove('show');
+    d.removeEventListener('click', back);
+    rollback();
+  };
+  d.addEventListener('click', back);
+}
+
+function rollback() {
+  if (!checkpoint) return;
+  cutscene = false;
+  // 移除回档点之后渲染的所有内容
+  while (flow.childElementCount > checkpoint.flowCount) {
+    flow.removeChild(flow.lastElementChild);
+  }
+  state.c = checkpoint.c;
+  state.i = checkpoint.i - 1;   // advance() 会重新渲染选择点
+  state.bead = checkpoint.bead;
+  save();
+  setWorld(checkpoint.world);
+  playAmbient(checkpoint.ambient);
+  renderBeads();
+  $('#chapter-label').textContent = checkpoint.label;
+  // 水墨回潮
+  flash(500);
+  setTimeout(() => advance(), 450);
+}
+
+/* 轻量段落演出（分支/死亡用，不进存档、不推进主线） */
+function applySegmentLite(seg) {
+  if (seg.world) {
+    const toDream = seg.world === 'dream';
+    if (toDream !== body.classList.contains('world-dream')) {
+      if (seg.fx === 'fall') fallTransition(() => setWorld(seg.world));
+      else { flash(320); setTimeout(() => setWorld(seg.world), 120); }
+    }
+  }
+  if (seg.ambient) playAmbient(seg.ambient);
+  flow.appendChild(segNode(seg));
+  scrollBottom();
+  if (seg.fx && seg.fx !== 'fall' && seg.fx !== 'slow') applyFx(seg.fx);
+  if (seg.sfx) playSfx(seg.sfx);
+  if (seg.voice && state.sound) playVoice(seg.voice);
+}
+
+/* ───────── 油锯拉绳小游戏 ───────── */
+const PULLS_NEED = 6, PULL_TIME = 7000, PULL_TRIES = 3;
+function gameNode(seg) {
+  const g = document.createElement('div');
+  g.className = 'seg game-panel';
+  g.innerHTML = `
+    <div class="game-title">猛 拉 启 动 绳</div>
+    <div class="game-tip">在屏幕上快速<b>向下滑动</b> ${PULLS_NEED} 次，拉响油锯！</div>
+    <div class="game-prog"><div class="game-prog-fill" style="width:0%"></div></div>
+    <div class="game-count">拉动 0 / ${PULLS_NEED} ｜ 剩余机会 ${'●'.repeat(PULL_TRIES)}</div>
+    <div class="game-timer"><div class="game-timer-fill"></div></div>`;
+  return g;
+}
+
+function startPullGame(panel) {
+  const fill = panel.querySelector('.game-prog-fill');
+  const count = panel.querySelector('.game-count');
+  const tfill = panel.querySelector('.game-timer-fill');
+  gameActive = { pulls: 0, tries: 0, t0: 0, raf: 0, panel, downY: null };
+  vibrate(60);
+  const tick = () => {
+    if (!gameActive) return;
+    const el = performance.now() - gameActive.t0;
+    tfill.style.width = Math.max(0, 100 - (el / PULL_TIME) * 100) + '%';
+    if (el >= PULL_TIME) { pullFail(); return; }
+    gameActive.raf = requestAnimationFrame(tick);
+  };
+  const resetTimer = () => {
+    gameActive.t0 = performance.now();
+    cancelAnimationFrame(gameActive.raf);
+    gameActive.raf = requestAnimationFrame(tick);
+  };
+  gameActive.resetTimer = resetTimer;
+  resetTimer();
+}
+function pullOnce() {
+  if (!gameActive) return;
+  gameActive.pulls++;
+  playSfx('pull');
+  vibrate(35);
+  const { panel, pulls, tries } = gameActive;
+  panel.querySelector('.game-prog-fill').style.width = (pulls / PULLS_NEED) * 100 + '%';
+  panel.querySelector('.game-count').innerHTML =
+    `拉动 ${pulls} / ${PULLS_NEED} ｜ 剩余机会 ${'●'.repeat(PULL_TRIES - tries)}${'○'.repeat(tries)}`;
+  if (pulls >= PULLS_NEED) pullSuccess();
+}
+function pullFail() {
+  if (!gameActive) return;
+  gameActive.tries++;
+  playSfx('sting'); vibrate([80, 40, 80]); shake(false);
+  if (gameActive.tries >= PULL_TRIES) {
+    endPullGame();
+    runDeath('gamefail');
+    return;
+  }
+  const { panel, tries } = gameActive;
+  panel.querySelector('.game-count').innerHTML =
+    `咔——没拉着！ ｜ 剩余机会 ${'●'.repeat(PULL_TRIES - tries)}${'○'.repeat(tries)}`;
+  gameActive.pulls = 0;
+  panel.querySelector('.game-prog-fill').style.width = '0%';
+  gameActive.resetTimer();
+}
+function pullSuccess() {
+  const panel = gameActive.panel;
+  endPullGame();
+  playSfx('cs_start');
+  setTimeout(() => playSfx('cs_run'), 1400);
+  vibrate([60, 40, 120]);
+  panel.classList.add('game-done');
+  panel.querySelector('.game-title').textContent = '轰——拉响了！';
+  panel.querySelector('.game-tip').innerHTML = '油锯发出一声低沉的咆哮。';
+  setTimeout(() => advance(), 1200);
+}
+function endPullGame() {
+  if (gameActive) cancelAnimationFrame(gameActive.raf);
+  gameActive = null;
+}
+
 /* ───────── 渲染段落 ───────── */
 function segNode(seg) {
   if (seg.t === 'div') {
     const d = document.createElement('div');
     d.className = 'seg divider'; d.textContent = '· · ·';
     return d;
+  }
+  if (seg.t === 'choice') return choicesNode(seg);
+  if (seg.t === 'game') {
+    const g = gameNode(seg);
+    g.addEventListener('click', (e) => e.stopPropagation());
+    return g;
   }
   const frag = document.createDocumentFragment();
   if (seg.img && IMAGES[seg.img]) {
@@ -398,18 +601,40 @@ function scheduleNext(delay) {
   clearTimeout(autoTimer);
   autoTimer = setTimeout(() => { if (autoMode) advance(); }, delay || 2200);
 }
-function segDwell(seg) {
-  if (seg.voice && state.sound) {
-    return playVoice(seg.voice).then((ms) => ms + 900);
-  }
+/* 每段的停留时长（自动播放用）；有配音时 = 配音时长 + 余韵 */
+let lastDwell = Promise.resolve(2200);
+function textDwell(seg) {
   const len = (seg.text || '').length;
-  return Promise.resolve(Math.min(6500, 1100 + len * 95));
+  return Math.min(6500, 1100 + len * 95);
 }
 
 /* ───────── 推进 ───────── */
 function curSeg() { return CHAPTERS[state.c].seg[state.i]; }
 
 function applySegment(seg) {
+  // 选择点：设回档点，渲染选项，等待玩家
+  if (seg.t === 'choice') {
+    if (autoMode) setAuto(false);
+    makeCheckpoint();
+    const box = choicesNode(seg);
+    pendingChoice = box;
+    flow.appendChild(box);
+    scrollBottom();
+    progress();
+    return;
+  }
+  // 小游戏：设回档点，启动拉绳
+  if (seg.t === 'game') {
+    if (autoMode) setAuto(false);
+    makeCheckpoint();
+    const g = gameNode(seg);
+    g.addEventListener('click', (e) => e.stopPropagation());
+    flow.appendChild(g);
+    scrollBottom();
+    startPullGame(g);
+    progress();
+    return;
+  }
   if (seg.world) {
     const toDream = seg.world === 'dream';
     const nowDream = body.classList.contains('world-dream');
@@ -429,12 +654,18 @@ function applySegment(seg) {
   scrollBottom();
   if (seg.fx && seg.fx !== 'fall' && seg.fx !== 'slow') applyFx(seg.fx);
   if (seg.sfx) playSfx(seg.sfx);
+  // 配音：任何模式下都播放（修复手动翻页无声的 bug）
+  if (seg.voice && state.sound) {
+    lastDwell = playVoice(seg.voice).then((ms) => ms + 900);
+  } else {
+    lastDwell = Promise.resolve(textDwell(seg));
+  }
   if (seg.clue) setTimeout(() => unlockClue(seg.clue), 900);
   progress();
 }
 
 function advance() {
-  if (state.done || segBusy) return;
+  if (state.done || segBusy || pendingChoice || gameActive || cutscene) return;
   segBusy = true;
   setTimeout(() => { segBusy = false; }, 280);
   const ch = CHAPTERS[state.c];
@@ -456,12 +687,12 @@ function advance() {
       setWorld(ch.world);
       playAmbient(ch.ambient);
       applySegment(seg);
-      if (autoMode) segDwell(seg).then(scheduleNext);
+      if (autoMode) lastDwell.then(scheduleNext);
     });
     return;
   }
   applySegment(seg);
-  if (autoMode) segDwell(seg).then(scheduleNext);
+  if (autoMode) lastDwell.then(scheduleNext);
 }
 
 /* ───────── 结尾 ───────── */
@@ -493,7 +724,13 @@ function enterReader(fresh) {
     for (let k = 0; k <= state.c; k++) {
       const end = k === state.c ? state.i : CHAPTERS[k].seg.length - 1;
       for (let j = 0; j <= end; j++) {
-        flow.appendChild(segNode(CHAPTERS[k].seg[j]));
+        const s = CHAPTERS[k].seg[j];
+        // 恢复时跳过互动段（选择/游戏不重演），并把指针回退到互动段之前
+        if (s.t === 'choice' || s.t === 'game') {
+          if (k === state.c) state.i = Math.min(state.i, j - 1);
+          continue;
+        }
+        flow.appendChild(segNode(s));
       }
     }
     $('#chapter-label').textContent = `第${ch.n}章 · ${ch.title}`;
@@ -524,6 +761,7 @@ reader.addEventListener('click', (e) => {
   tapAdvance();
 });
 reader.addEventListener('touchstart', (e) => {
+  if (gameActive) { gameActive.downY = e.touches[0].clientY; return; }
   touchY = e.touches[0].clientY;
   longPressed = false;
   clearTimeout(pressTimer);
@@ -533,9 +771,18 @@ reader.addEventListener('touchstart', (e) => {
   }, 620);
 }, { passive: true });
 reader.addEventListener('touchmove', (e) => {
+  if (gameActive) return;
   if (touchY !== null && Math.abs(e.touches[0].clientY - touchY) > 12) clearTimeout(pressTimer);
 }, { passive: true });
 reader.addEventListener('touchend', (e) => {
+  if (gameActive) {
+    if (gameActive.downY !== null) {
+      const dy = e.changedTouches[0].clientY - gameActive.downY;
+      gameActive.downY = null;
+      if (dy > 45) pullOnce();   // 下拉一次 = 拽一次拉绳
+    }
+    return;
+  }
   clearTimeout(pressTimer);
   if (touchY === null) return;
   const dy = e.changedTouches[0].clientY - touchY;
@@ -549,6 +796,16 @@ reader.addEventListener('touchend', (e) => {
   }
 });
 reader.addEventListener('contextmenu', (e) => e.preventDefault());
+
+/* 小游戏的鼠标支持（电脑预览用） */
+let mouseDownY = null;
+reader.addEventListener('mousedown', (e) => { if (gameActive) mouseDownY = e.clientY; });
+reader.addEventListener('mouseup', (e) => {
+  if (!gameActive || mouseDownY === null) return;
+  const dy = e.clientY - mouseDownY;
+  mouseDownY = null;
+  if (dy > 45) pullOnce();
+});
 
 /* 图鉴抽屉 */
 function openDrawer() { renderClueDrawer(); $('#clue-drawer').classList.add('show'); $('#drawer-mask').classList.add('show'); }
