@@ -740,6 +740,11 @@ function enterReader(fresh) {
     state = { c: 0, i: -1, clues: [], bead: 0, sound: state.sound, done: false };
     flow.innerHTML = '';
     save();
+  } else if (state.done && state.c < CHAPTERS.length - 1) {
+    // 旧通关存档：直接进入新增的第一章
+    state.done = false; state.c++; state.i = -1;
+    flow.innerHTML = '';
+    save();
   }
   $('#title-screen').classList.add('hidden');
   $('#reader').classList.remove('hidden');
@@ -775,7 +780,9 @@ $('#btn-start').addEventListener('click', () => {
   enterReader(true);
 });
 $('#btn-continue').addEventListener('click', () => enterReader(false));
-if (state.i >= 0 && !state.done) $('#btn-continue').classList.remove('hidden');
+// 旧存档已通关、但新章节已上线：允许从新增章节继续
+const hasNewChapters = state.done && state.c < CHAPTERS.length - 1;
+if ((state.i >= 0 && !state.done) || hasNewChapters) $('#btn-continue').classList.remove('hidden');
 
 /* ───────── 手势：轻触 / 上滑 / 长按自动播放 ───────── */
 let pressTimer = null, touchY = null, longPressed = false;
