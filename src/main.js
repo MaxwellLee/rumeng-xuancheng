@@ -81,11 +81,13 @@ function playVoice(id) {
 
 /* ───────── 状态 ───────── */
 const SAVE_KEY = 'rmxc-save-v2';
-let state = { c: 0, i: -1, clues: [], bead: 0, sound: true, done: false, deaths: [] };
+let state = { c: 0, i: -1, clues: [], bead: 0, sound: true, done: false, deaths: [], maxC: 0 };
 try {
   const s = JSON.parse(localStorage.getItem(SAVE_KEY));
   if (s && typeof s.c === 'number') state = Object.assign(state, s);
   if (!Array.isArray(state.deaths)) state.deaths = [];
+  if (typeof state.maxC !== 'number') state.maxC = state.c;  // 旧存档：已读章节即当前章
+  state.maxC = Math.max(state.maxC, state.c);
 } catch (e) {}
 function save() { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }
 
@@ -700,7 +702,9 @@ function advance() {
   const ch = CHAPTERS[state.c];
   if (state.i + 1 >= ch.seg.length) {
     if (state.c + 1 >= CHAPTERS.length) { setAuto(false); showEnding(); return; }
-    state.c++; state.i = -1; save();
+    state.c++; state.i = -1;
+    state.maxC = Math.max(state.maxC, state.c);   // 解锁新章节
+    save();
     const nch = CHAPTERS[state.c];
     showChapterCard(nch, () => {
       setWorld(nch.world);
@@ -737,7 +741,7 @@ function showEnding() {
 /* ───────── 启动 ───────── */
 function enterReader(fresh) {
   if (fresh) {
-    state = { c: 0, i: -1, clues: [], bead: 0, sound: state.sound, done: false };
+    state = { c: 0, i: -1, clues: [], bead: 0, sound: state.sound, done: false, deaths: [], maxC: 0 };
     flow.innerHTML = '';
     save();
   } else if (state.done && state.c < CHAPTERS.length - 1) {
@@ -791,7 +795,7 @@ const reader = $('#reader');
 function tapAdvance() { advance(); }
 
 reader.addEventListener('click', (e) => {
-  if (e.target.closest('.icon-btn') || e.target.closest('#clue-drawer')) return;
+  if (e.target.closest('.icon-btn') || e.target.closest('#clue-drawer') || e.target.closest('#chapter-drawer')) return;
   if (longPressed) { longPressed = false; return; }
   if (autoMode) { setAuto(false); return; }
   tapAdvance();
@@ -845,8 +849,45 @@ reader.addEventListener('mouseup', (e) => {
 
 /* 图鉴抽屉 */
 function openDrawer() { renderClueDrawer(); $('#clue-drawer').classList.add('show'); $('#drawer-mask').classList.add('show'); }
-function closeDrawer() { $('#clue-drawer').classList.remove('show'); $('#drawer-mask').classList.remove('show'); }
+function closeDrawer() {
+  $('#clue-drawer').classList.remove('show');
+  $('#chapter-drawer').classList.remove('show');
+  $('#drawer-mask').classList.remove('show');
+}
 $('#btn-clues').addEventListener('click', (e) => { e.stopPropagation(); openDrawer(); });
+
+/* ───────── 章节选择 ───────── */
+function renderChapterDrawer() {
+  const box = $('#chapter-list'); box.innerHTML = '';
+  CHAPTERS.forEach((ch, k) => {
+    const unlocked = k <= state.maxC;
+    const it = document.createElement('div');
+    it.className = 'ch-item' + (unlocked ? '' : ' locked') + (k === state.c ? ' cur' : '');
+    it.innerHTML =
+      `<div class="cn">第${ch.n}章 · ${ch.title}<small>${unlocked ? '' : '未 至'}</small></div>` +
+      `<div class="st">${k === state.c ? '在读' : (unlocked ? '进入' : '🔒')}</div>`;
+    if (unlocked && k !== state.c) {
+      it.addEventListener('click', (e) => { e.stopPropagation(); jumpToChapter(k); });
+    }
+    box.appendChild(it);
+  });
+}
+function openChapterDrawer() {
+  renderChapterDrawer();
+  $('#chapter-drawer').classList.add('show');
+  $('#drawer-mask').classList.add('show');
+}
+function jumpToChapter(k) {
+  closeDrawer();
+  setAuto(false);
+  pendingChoice = null; cutscene = false; gameActive = null;
+  state.c = k; state.i = -1; state.done = false;
+  state.bead = k >= 3 ? 2 : (k >= 1 ? 1 : 0);   // 玉珠状态对齐剧情：1章裂、3章碎
+  flow.innerHTML = '';
+  save(); renderBeads(); progress();
+  advance();   // i=-1 → 先出章节卡，再进首段
+}
+$('#btn-chapters').addEventListener('click', (e) => { e.stopPropagation(); openChapterDrawer(); });
 $('#drawer-mask').addEventListener('click', closeDrawer);
 
 /* 声音开关 */
