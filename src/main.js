@@ -468,6 +468,7 @@ function startPullGame(panel) {
   const count = panel.querySelector('.game-count');
   const tfill = panel.querySelector('.game-timer-fill');
   gameActive = { pulls: 0, tries: 0, t0: 0, raf: 0, panel, downY: null };
+  flow.classList.add('lock');   // 游戏期间锁死文字滚动
   vibrate(60);
   const tick = () => {
     if (!gameActive) return;
@@ -525,6 +526,7 @@ function pullSuccess() {
 function endPullGame() {
   if (gameActive) cancelAnimationFrame(gameActive.raf);
   gameActive = null;
+  flow.classList.remove('lock');   // 解除文字锁定
 }
 
 /* ───────── 渲染段落 ───────── */
@@ -771,9 +773,9 @@ reader.addEventListener('touchstart', (e) => {
   }, 620);
 }, { passive: true });
 reader.addEventListener('touchmove', (e) => {
-  if (gameActive) return;
+  if (gameActive) { e.preventDefault(); return; }   // 游戏手势不滚动文字
   if (touchY !== null && Math.abs(e.touches[0].clientY - touchY) > 12) clearTimeout(pressTimer);
-}, { passive: true });
+}, { passive: false });
 reader.addEventListener('touchend', (e) => {
   if (gameActive) {
     if (gameActive.downY !== null) {

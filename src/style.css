@@ -129,6 +129,7 @@ body:not(.world-dream) .bead.shattered::after { background: var(--r-bg); }
   scrollbar-width: none;
 }
 #flow::-webkit-scrollbar { display: none; }
+#flow.lock { overflow: hidden; }
 
 .seg { opacity: 0; transform: translateY(14px); animation: segIn .7s ease forwards; margin-bottom: 22px; }
 @keyframes segIn { to { opacity: 1; transform: none; } }
