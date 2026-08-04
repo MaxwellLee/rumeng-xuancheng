@@ -496,7 +496,7 @@ function startPullGame(panel) {
   const fill = panel.querySelector('.game-prog-fill');
   const count = panel.querySelector('.game-count');
   const tfill = panel.querySelector('.game-timer-fill');
-  gameActive = { pulls: 0, tries: 0, t0: 0, raf: 0, panel, downY: null };
+  gameActive = { type: 'pull', pulls: 0, tries: 0, t0: 0, raf: 0, panel, downY: null };
   flow.classList.add('lock');   // 游戏期间锁死文字滚动
   vibrate(60);
   const tick = () => {
@@ -556,6 +556,209 @@ function endPullGame() {
   if (gameActive) cancelAnimationFrame(gameActive.raf);
   gameActive = null;
   flow.classList.remove('lock');   // 解除文字锁定
+}
+
+/* ───────── 小游戏2：踏空飞行 ───────── */
+function flyGameNode() {
+  const g = document.createElement('div');
+  g.className = 'seg game-panel fly-panel';
+  g.innerHTML = `
+    <div class="game-title">踏 空 而 行</div>
+    <div class="game-tip"><b>长按屏幕上升，松手下落</b>——躲开白影，飞到城墙！</div>
+    <canvas class="fly-cv"></canvas>
+    <div class="game-count fly-status">擦撞 0 / 3 ｜ 云层之上，夜风正急</div>`;
+  return g;
+}
+
+function startFlyGame(panel) {
+  const cv = panel.querySelector('.fly-cv');
+  const status = panel.querySelector('.fly-status');
+  const W = panel.clientWidth || 320, H = Math.min(400, Math.round(W * 0.72));
+  cv.width = W * devicePixelRatio; cv.height = H * devicePixelRatio;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  const ctx = cv.getContext('2d');
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+
+  const G = 0.16, THRUST = 0.34, MAXV = 5.2;
+  const PX = W * 0.24;               // 玩家固定横坐标
+  gameActive = {
+    type: 'fly', panel, raf: 0, downY: null,
+    y: H * 0.5, vy: 0, holding: false,
+    wraiths: [], dist: 0, hits: 0, invT: 0, wallX: null,
+    spawnT: 0, t0: performance.now(),
+  };
+  flow.classList.add('lock');
+  vibrate(50);
+  playSfx('whoosh');
+
+  const onDown = (e) => { e.preventDefault(); e.stopPropagation(); if (gameActive) gameActive.holding = true; };
+  const onUp = (e) => { e.preventDefault(); if (gameActive) gameActive.holding = false; };
+  cv.addEventListener('touchstart', onDown, { passive: false });
+  cv.addEventListener('touchend', onUp, { passive: false });
+  cv.addEventListener('touchcancel', onUp, { passive: false });
+  cv.addEventListener('mousedown', onDown);
+  window.addEventListener('mouseup', onUp);
+  gameActive.cleanup = () => {
+    cv.removeEventListener('touchstart', onDown);
+    cv.removeEventListener('touchend', onUp);
+    cv.removeEventListener('touchcancel', onUp);
+    cv.removeEventListener('mousedown', onDown);
+    window.removeEventListener('mouseup', onUp);
+  };
+
+  function spawnWraith() {
+    const g = gameActive;
+    g.wraiths.push({
+      x: W + 30, y: 40 + Math.random() * (H - 110),
+      r: 15 + Math.random() * 9,
+      v: 1.7 + Math.random() * 1.1 + g.dist * 0.012,
+      wob: Math.random() * 6.28,
+    });
+  }
+
+  function drawPlayer(g) {
+    const inv = g.invT > 0 && Math.floor(g.invT / 6) % 2 === 0;
+    ctx.save();
+    ctx.globalAlpha = inv ? 0.35 : 1;
+    // 红绫拖尾
+    ctx.strokeStyle = 'rgba(179,35,42,.75)'; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(PX - 8, g.y + 2);
+    ctx.quadraticCurveTo(PX - 26, g.y + Math.sin(g.dist * .3) * 7 - 6, PX - 44, g.y + Math.sin(g.dist * .3 + 1) * 10 - 2);
+    ctx.stroke();
+    // 两个飞行的小身影（韦桉托着唐司马）
+    ctx.fillStyle = '#14100f';
+    ctx.strokeStyle = 'rgba(232,221,201,.85)'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.ellipse(PX, g.y, 10, 5.5, -0.25, 0, 6.29); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(PX - 13, g.y + 5, 8, 4.5, -0.25, 0, 6.29); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(232,221,201,.9)';
+    ctx.beginPath(); ctx.arc(PX + 8, g.y - 4, 3, 0, 6.29); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawWraith(w, t) {
+    const wobY = Math.sin(t / 300 + w.wob) * 6;
+    ctx.save();
+    ctx.globalAlpha = 0.88;
+    const grad = ctx.createRadialGradient(w.x, w.y + wobY, 2, w.x, w.y + wobY, w.r * 1.7);
+    grad.addColorStop(0, 'rgba(240,238,230,.95)');
+    grad.addColorStop(0.55, 'rgba(220,218,210,.55)');
+    grad.addColorStop(1, 'rgba(220,218,210,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.ellipse(w.x, w.y + wobY, w.r * 1.5, w.r * 1.8, 0, 0, 6.29); ctx.fill();
+    // 三个空洞
+    ctx.fillStyle = 'rgba(8,6,10,.9)';
+    ctx.beginPath(); ctx.ellipse(w.x - w.r * .42, w.y + wobY - w.r * .3, w.r * .2, w.r * .3, 0, 0, 6.29); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(w.x + w.r * .42, w.y + wobY - w.r * .3, w.r * .2, w.r * .3, 0, 0, 6.29); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(w.x, w.y + wobY + w.r * .45, w.r * .24, w.r * .34, 0, 0, 6.29); ctx.fill();
+    ctx.restore();
+  }
+
+  function frame(now) {
+    const g = gameActive;
+    if (!g) return;
+    const t = now - g.t0;
+    // 物理
+    g.vy += G; if (g.holding) g.vy -= THRUST + G * 0.9;
+    g.vy = Math.max(-MAXV, Math.min(MAXV, g.vy));
+    g.y += g.vy;
+    if (g.y < 18) { g.y = 18; g.vy = 0; }
+    if (g.y > H - 34) { g.y = H - 34; g.vy = 0; }
+    // 进度与生成
+    g.dist += 0.075;
+    g.spawnT -= 1;
+    const gap = Math.max(52, 105 - g.dist * 0.5);
+    if (g.spawnT <= 0 && g.dist < 86) { spawnWraith(); g.spawnT = gap * (0.75 + Math.random() * 0.5); }
+    if (g.dist >= 86 && g.wallX === null) g.wallX = W + 40;
+    if (g.invT > 0) g.invT--;
+    // 移动与碰撞
+    for (const w of g.wraiths) { w.x -= w.v; }
+    g.wraiths = g.wraiths.filter((w) => w.x > -60);
+    if (g.invT <= 0) {
+      for (const w of g.wraiths) {
+        const dx = w.x - PX, dy = w.y - g.y;
+        if (dx * dx + dy * dy < (w.r * 1.1 + 9) * (w.r * 1.1 + 9)) {
+          g.hits++; g.invT = 75;
+          playSfx('sting'); vibrate([90, 50, 90]); shake(false);
+          status.innerHTML = `擦撞 ${g.hits} / 3 ｜ ${g.hits >= 2 ? '梦境开始结冰……' : '稳住！'}`;
+          g.wraiths = g.wraiths.filter((x) => x !== w);
+          break;
+        }
+      }
+    }
+    if (g.hits >= 3) { flyFail(); return; }
+    if (g.wallX !== null) {
+      g.wallX -= 2.1;
+      if (g.wallX <= PX + 40) { flySuccess(); return; }
+    }
+
+    // ── 绘制 ──
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#0b0710'); sky.addColorStop(0.7, '#160a12'); sky.addColorStop(1, '#1f0d12');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    // 月
+    ctx.fillStyle = 'rgba(232,221,201,.8)';
+    ctx.beginPath(); ctx.arc(W * 0.78, H * 0.2, 16, 0, 6.29); ctx.fill();
+    ctx.fillStyle = 'rgba(11,7,16,.35)';
+    ctx.beginPath(); ctx.arc(W * 0.78 + 6, H * 0.2 - 4, 14, 0, 6.29); ctx.fill();
+    // 云层（按距离滚动）
+    ctx.fillStyle = 'rgba(120,90,90,.10)';
+    for (let i = 0; i < 4; i++) {
+      const cx = ((i * 220 - g.dist * 9) % (W + 160) + W + 160) % (W + 160) - 80;
+      ctx.beginPath(); ctx.ellipse(cx, 40 + i * 24 % (H - 90), 90, 14, 0, 0, 6.29); ctx.fill();
+    }
+    // 林海剪影
+    ctx.fillStyle = '#070507';
+    ctx.beginPath(); ctx.moveTo(0, H);
+    for (let x = 0; x <= W; x += 8) {
+      const h = 22 + Math.sin((x + g.dist * 14) * 0.05) * 9 + Math.sin((x + g.dist * 14) * 0.13) * 5;
+      ctx.lineTo(x, H - h);
+    }
+    ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    // 城墙逼近
+    if (g.wallX !== null) {
+      ctx.fillStyle = '#0d0a0c';
+      ctx.fillRect(g.wallX, H * 0.18, 70, H);
+      ctx.fillStyle = 'rgba(179,35,42,.55)';
+      for (let k = 0; k < 5; k++) ctx.fillRect(g.wallX + 8 + k * 13, H * 0.18 + 14, 5, 26); // 火把窗
+      ctx.fillStyle = 'rgba(201,162,75,.9)';
+      ctx.font = '11px serif'; ctx.fillText('悬 圃 城 墙', g.wallX - 6, H * 0.18 - 8);
+    }
+    for (const w of g.wraiths) drawWraith(w, t);
+    drawPlayer(g);
+    // 进度条
+    ctx.fillStyle = 'rgba(232,221,201,.18)'; ctx.fillRect(12, 10, W - 24, 3);
+    ctx.fillStyle = 'rgba(201,162,75,.9)'; ctx.fillRect(12, 10, (W - 24) * Math.min(1, g.dist / 100), 3);
+
+    g.raf = requestAnimationFrame(frame);
+  }
+  gameActive.raf = requestAnimationFrame(frame);
+}
+
+function flySuccess() {
+  const g = gameActive;
+  g.cleanup();
+  cancelAnimationFrame(g.raf);
+  const panel = g.panel;
+  gameActive = null;
+  flow.classList.remove('lock');
+  playSfx('whoosh');
+  vibrate([50, 40, 90]);
+  panel.classList.add('game-done');
+  panel.querySelector('.game-title').textContent = '看见城墙了——';
+  panel.querySelector('.game-tip').innerHTML = '唐司马：落地，我们要到了。';
+  panel.querySelector('.fly-status').innerHTML = '踏空而行 · 通过';
+  setTimeout(() => advance(), 1400);
+}
+
+function flyFail() {
+  const g = gameActive;
+  g.cleanup();
+  cancelAnimationFrame(g.raf);
+  gameActive = null;
+  flow.classList.remove('lock');
+  shake(true); vibrate([140, 80, 220]);
+  runDeath('crash');
 }
 
 /* ───────── 渲染段落 ───────── */
@@ -654,15 +857,15 @@ function applySegment(seg) {
     progress();
     return;
   }
-  // 小游戏：设回档点，启动拉绳
+  // 小游戏：设回档点，按 id 启动拉绳 / 踏空飞行
   if (seg.t === 'game') {
     if (autoMode) setAuto(false);
     makeCheckpoint();
-    const g = gameNode(seg);
+    const g = seg.id === 'fly' ? flyGameNode() : gameNode(seg);
     g.addEventListener('click', (e) => e.stopPropagation());
     flow.appendChild(g);
     scrollBottom();
-    startPullGame(g);
+    if (seg.id === 'fly') startFlyGame(g); else startPullGame(g);
     progress();
     return;
   }
@@ -756,6 +959,7 @@ function enterReader(fresh) {
   $('#reader').classList.remove('hidden');
   $('#topbar').classList.remove('hidden');
   $('#tap-hint').classList.remove('hidden');
+  showCoach();
   renderBeads(); renderClueDrawer(); progress();
   const ch = CHAPTERS[state.c];
   setWorld(ch.world);
@@ -797,14 +1001,32 @@ const reader = $('#reader');
 
 function tapAdvance() { advance(); }
 
+/* 开场手势教学：进入阅读器时弹出，首次交互或 4.6s 后消失 */
+function showCoach() {
+  const c = $('#coach');
+  c.classList.remove('hidden');
+  requestAnimationFrame(() => c.classList.add('show'));
+  clearTimeout(showCoach._t);
+  showCoach._t = setTimeout(hideCoach, 4600);
+}
+function hideCoach() {
+  const c = $('#coach');
+  if (c.classList.contains('hidden')) return;
+  c.classList.remove('show');
+  clearTimeout(showCoach._t);
+  setTimeout(() => c.classList.add('hidden'), 500);
+}
+
 reader.addEventListener('click', (e) => {
   if (e.target.closest('.icon-btn') || e.target.closest('#clue-drawer') || e.target.closest('#chapter-drawer')) return;
+  hideCoach();
   if (longPressed) { longPressed = false; return; }
   if (autoMode) { setAuto(false); return; }
   tapAdvance();
 });
 reader.addEventListener('touchstart', (e) => {
-  if (gameActive) { gameActive.downY = e.touches[0].clientY; return; }
+  hideCoach();
+  if (gameActive) { if (gameActive.type === 'pull') gameActive.downY = e.touches[0].clientY; return; }
   touchY = e.touches[0].clientY;
   longPressed = false;
   clearTimeout(pressTimer);
@@ -819,7 +1041,7 @@ reader.addEventListener('touchmove', (e) => {
 }, { passive: false });
 reader.addEventListener('touchend', (e) => {
   if (gameActive) {
-    if (gameActive.downY !== null) {
+    if (gameActive.type === 'pull' && gameActive.downY !== null) {
       const dy = e.changedTouches[0].clientY - gameActive.downY;
       gameActive.downY = null;
       if (dy > 45) pullOnce();   // 下拉一次 = 拽一次拉绳
@@ -842,9 +1064,9 @@ reader.addEventListener('contextmenu', (e) => e.preventDefault());
 
 /* 小游戏的鼠标支持（电脑预览用） */
 let mouseDownY = null;
-reader.addEventListener('mousedown', (e) => { if (gameActive) mouseDownY = e.clientY; });
+reader.addEventListener('mousedown', (e) => { if (gameActive && gameActive.type === 'pull') mouseDownY = e.clientY; });
 reader.addEventListener('mouseup', (e) => {
-  if (!gameActive || mouseDownY === null) return;
+  if (!gameActive || gameActive.type !== 'pull' || mouseDownY === null) return;
   const dy = e.clientY - mouseDownY;
   mouseDownY = null;
   if (dy > 45) pullOnce();

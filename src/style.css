@@ -395,3 +395,26 @@ canvas.wave {
 .ch-item.cur { border-color: rgba(179,35,42,.65); background: rgba(179,35,42,.08); cursor: default; }
 .ch-item.cur .st { color: #b3232a; }
 .ch-item.locked { opacity: .38; cursor: not-allowed; }
+
+/* ───── 飞行游戏面板 ───── */
+.fly-panel .fly-cv {
+  display: block; width: 100%; border-radius: 10px; margin: 10px 0 8px;
+  background: #0b0710; touch-action: none; cursor: pointer;
+}
+
+/* ───── 开场手势教学 ───── */
+#coach {
+  position: absolute; inset: 0; z-index: 25; display: flex; align-items: flex-end; justify-content: center;
+  pointer-events: none; opacity: 0; transition: opacity .5s ease; padding-bottom: 24%;
+}
+#coach.show { opacity: 1; }
+.coach-card {
+  background: rgba(10,8,12,.82); border: 1px solid rgba(201,180,143,.35);
+  border-radius: 14px; padding: 14px 22px; backdrop-filter: blur(4px);
+}
+.coach-row { display: flex; align-items: center; gap: 12px; font-size: 13px; letter-spacing: 3px; color: #d9cfbd; padding: 5px 0; }
+.coach-row .ci {
+  width: 26px; height: 26px; border: 1px solid rgba(201,180,143,.5); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 11px; color: #c9b48f;
+  letter-spacing: 0; flex: 0 0 auto;
+}
